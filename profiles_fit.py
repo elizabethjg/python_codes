@@ -11,69 +11,61 @@ Msun=1.989e30 # Solar mass (kg)
 
 
 def disp_sis(M200,H):
-	return (((np.mean(M200)*((50**0.5)*G*H*Msun))/2.)**(1./3.))/1.e3
+	'''
+	
+	Returns the velocity dispersion according to a M200 mass
+	assuming an SIS model
+	------------------------------------------------------------------
+	INPUT:
+	M200         (float or array of floats) M_200 mass in solar masses
+	H            (float or array of floats) Hubble constant computed
+	             at the redshift of the halo
+	------------------------------------------------------------------
+	OUTPUT:
+	disp         (float or array of floats) Velocity dispersion
+	
+	'''
+	return (((M200*((50**0.5)*G*H*Msun))/2.)**(1./3.))/1.e3
 	
 
 def r200_nfw(M200,roc_mpc):	
-	return ((np.mean(M200)*(3.0*Msun))/(800.0*np.pi*roc_mpc))**(1./3.)
+	'''
+	
+	Returns the R_200
+	------------------------------------------------------------------
+	INPUT:
+	M200         (float or array of floats) M_200 mass in solar masses
+	roc_mpc      (float or array of floats) Critical density at the z 
+	             of the halo in units of kg/Mpc**3
+	------------------------------------------------------------------
+	OUTPUT:
+	R_200         (float or array of floats) 
+	
+	'''
+
+	return ((M200*(3.0*Msun))/(800.0*np.pi*roc_mpc))**(1./3.)
 
 
 
 def chi_red(ajuste,data,err,gl):
-	from scipy import integrate
+	'''
+	Reduced chi**2
+	------------------------------------------------------------------
+	INPUT:
+	ajuste       (float or array of floats) fitted value/s
+	data         (float or array of floats) data used for fitting
+	err          (float or array of floats) error in data
+	gl           (float) grade of freedom (number of fitted variables)
+	------------------------------------------------------------------
+	OUTPUT:
+	chi          (float) Reduced chi**2 	
+	'''
+		
 	BIN=len(data)
 	chi=((((ajuste-data)**2)/(err**2)).sum())/float(BIN-1-gl)
 	return chi
 
 
-def delta_fi(fi):
-	return 1./np.sqrt(np.cos(fi)**2+(f**2)*np.sin(fi)**2)
-
-
-def esis_profile_sigma(RDfi,f,disp):
-	R,fi = RDfi
-	Rm=R*1.e6*pc
-	R0 = ((disp*1.e3)**2)/G
-	b = (Rm/R0)*np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
-	D_Sigma = (np.sqrt(f)/(2.*b))*(pc**2/Msun)
-	Rout = R*np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
-	return D_Sigma
-	
-		
-def e_SIS_stack_fit(R,fi,D_Sigma,err):	
-
-	e_SIS_out=curve_fit(esis_profile_sigma2,(R,fi),D_Sigma,sigma=err,absolute_sigma=True)
-	pcov=e_SIS_out[1]
-	perr = np.sqrt(np.diag(pcov))
-	e_f=perr[0]
-	e_disp=perr[1]
-	f=e_SIS_out[0][0]
-	disp=e_SIS_out[0][1]		
-
-
-
-
-def esis_profile_sigma_mod_per(R,fi,f,disp=250.):
-	Rm = R*1.e6*pc
-	R0 = ((disp*1.e3)**2)/G
-	x2 = lambda fi: 1./np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
-	integral1 = integrate.quad(x2, 0.25*np.pi, 0.75*np.pi)[0]
-	integral2 = integrate.quad(x2, 1.25*np.pi, 1.75*np.pi)[0]
-	D_Sigma = (R0/Rm)*(np.sqrt(f)/np.pi)*(integral1+integral2)
-	Rout = R
-	return Rout,D_Sigma	
-	
-	
-def esis_profile_sigma_mod_par(R,fi,f,disp=250.):
-	Rm = R*1.e6*pc
-	R0 = ((disp*1.e3)**2)/G
-	x2 = lambda fi: 1./np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
-	integral1 = integrate.quad(x2, 0.*np.pi, 0.25*np.pi)[0]
-	integral2 = integrate.quad(x2, 0.75*np.pi, 1.25*np.pi)[0]
-	integral3 = integrate.quad(x2, 1.75*np.pi, 2.*np.pi)[0]
-	D_Sigma = (R0/Rm)*(np.sqrt(f)/np.pi)*(integral1+integral2+integral3)
-	Rout = R
-	return Rout,D_Sigma	
 
 def sis_profile_sigma(R,sigma):
 	Rm=R*1.e6*pc
@@ -190,6 +182,53 @@ def NFW_stack_fit(R,D_Sigma,err,z,roc,fitc = False, h = 0.7):
 	
 	return R200,e_R200,chired,xplot,yplot,c,e_c
 	
+def SIGMA_nfw(datos,R200):		
+	'''
+	Surface mass density for NFW (Eq. 11 - Wright and Brainerd 2000)
+	------------------------------------------------------------------
+	INPUT:
+	datos        (list or tupple) contains [R,roc_mpc,z]
+	             R        (float array) distance to the centre in Mpc
+	             roc_mpc  (float) Critical density at the z of the halo in units of kg/Mpc**3
+	             z        (float) Redshift of the halo
+	             h        (float) Incertanty factor in constant Huble
+	R200         (float)  R_200 in Mpc
+	------------------------------------------------------------------
+	OUTPUT:
+	Sigma(R)     (float array) Surface mass density in units of M_Sun/pc2
+	'''		
+	R, roc_mpc, z, h = datos
+	
+	if not isinstance(R, (np.ndarray)):
+		R = np.array([R])
+	
+	#calculo de c usando la relacion de Duffy et al 2008
+	M=((800.0*np.pi*roc_mpc*(R200**3))/(3.0*Msun))*h
+	c=5.71*((M/2.e12)**-0.084)*((1.+z)**-0.47)
+	####################################################
+	
+	deltac=(200./3.)*( (c**3) / ( np.log(1.+c)- (c/(1+c)) ))
+	c = c.astype(float128)
+	x=(R*c)/R200
+	m1 = x < 1.0
+	m2 = x > 1.0
+	m3 = x == 1.0
+
+	jota  = np.zeros(len(x))
+	atanh = np.arctanh(np.sqrt((1.0-x[m1])/(1.0+x[m1])))
+	jota[m1] = (1./(x[m1]**2-1.))*(1.-(2./np.sqrt(1.-x[m1]**2))*atanh) 
+
+	atan = np.arctan(np.sqrt((x[m2]-1.0)/(1.0+x[m2])))
+	jota[m2] = (1./(x[m2]**2-1.))*(1.-(2./np.sqrt(x[m2]**2 - 1.))*atan) 
+
+	jota[m3] = 1./3.
+					
+	rs_m=(R200*1.e6*pc)/c
+	
+	kapak=((2.*rs_m*deltac*roc_mpc)*(pc**2/Msun))/((pc*1.0e6)**3.0)
+	return kapak*jota
+
+	
 def shear_map(x,y,e,theta,npix):
 	stepx=(x.max()-x.min())/npix
 	stepy=(y.max()-y.min())/npix
@@ -255,3 +294,57 @@ def shear_map2(x,y,e1,e2,npix):
 		inx=inx+stepx	
 		#~ plt.show()
 	return xbin,ybin,ex,ey,ngx
+
+'''
+ELLIPTICAL EQUATIONS FOR A SIS PROFILE
+'''
+
+
+def delta_fi(fi):
+	return 1./np.sqrt(np.cos(fi)**2+(f**2)*np.sin(fi)**2)
+
+
+def esis_profile_sigma(RDfi,f,disp):
+	R,fi = RDfi
+	Rm=R*1.e6*pc
+	R0 = ((disp*1.e3)**2)/G
+	b = (Rm/R0)*np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
+	D_Sigma = (np.sqrt(f)/(2.*b))*(pc**2/Msun)
+	Rout = R*np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
+	return D_Sigma
+	
+		
+def e_SIS_stack_fit(R,fi,D_Sigma,err):	
+
+	e_SIS_out=curve_fit(esis_profile_sigma2,(R,fi),D_Sigma,sigma=err,absolute_sigma=True)
+	pcov=e_SIS_out[1]
+	perr = np.sqrt(np.diag(pcov))
+	e_f=perr[0]
+	e_disp=perr[1]
+	f=e_SIS_out[0][0]
+	disp=e_SIS_out[0][1]		
+
+
+
+
+def esis_profile_sigma_mod_per(R,fi,f,disp=250.):
+	Rm = R*1.e6*pc
+	R0 = ((disp*1.e3)**2)/G
+	x2 = lambda fi: 1./np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
+	integral1 = integrate.quad(x2, 0.25*np.pi, 0.75*np.pi)[0]
+	integral2 = integrate.quad(x2, 1.25*np.pi, 1.75*np.pi)[0]
+	D_Sigma = (R0/Rm)*(np.sqrt(f)/np.pi)*(integral1+integral2)
+	Rout = R
+	return Rout,D_Sigma	
+	
+	
+def esis_profile_sigma_mod_par(R,fi,f,disp=250.):
+	Rm = R*1.e6*pc
+	R0 = ((disp*1.e3)**2)/G
+	x2 = lambda fi: 1./np.sqrt((f**2)*np.cos(fi)**2+np.sin(fi)**2)
+	integral1 = integrate.quad(x2, 0.*np.pi, 0.25*np.pi)[0]
+	integral2 = integrate.quad(x2, 0.75*np.pi, 1.25*np.pi)[0]
+	integral3 = integrate.quad(x2, 1.75*np.pi, 2.*np.pi)[0]
+	D_Sigma = (R0/Rm)*(np.sqrt(f)/np.pi)*(integral1+integral2+integral3)
+	Rout = R
+	return Rout,D_Sigma	
