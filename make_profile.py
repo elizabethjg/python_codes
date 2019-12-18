@@ -179,7 +179,108 @@ def shear_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,
 		CVex = None
 		
 	return [R,SHEAR/Mcorr,CERO/Mcorr,err/Mcorr,nbin,error_et/Mcorr,error_ex/Mcorr,N,CVet,CVex]
+
+
+def quadrupole_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,angle,
+                      ndots=15,stepbin=False,booterror_flag=False,
+                      lin=False,boot_stack=[],nboot = 100,cov_matrix = False):
+		
+	if lin:
+		if stepbin:
+			nbin = int((ROUT - RIN)/stepbin)
+		else:
+			nbin = int(ndots)
+		bines = np.linspace(RIN,ROUT,num=nbin+1)
+	else:
+		if stepbin:
+			nbin = int((np.log10(ROUT) - np.log10(RIN))/stepbin)
+		else:
+			nbin = int(ndots)
+		bines = np.logspace(np.log10(RIN),np.log10(ROUT),num=nbin+1)
+		
+	if cov_matrix and len(boot_stack):
+		ides       = np.unique(boot_stack)
+		digit      = np.digitize(r,bines)
+		totbines   = np.arange(1,nbin+1)
+		maskid     = np.array([all(np.in1d(totbines,digit[boot_stack==x])==True) for x in ides])
+		maskides   = np.in1d(boot_stack,ides[maskid])
+		boot_stack = boot_stack[maskides]
+		r          = r[maskides]
+		et         = et[maskides]
+		ex         = ex[maskides]
+		peso       = peso[maskides]
+		m          = m[maskides]
+		sigma_c    = sigma_c[maskides]
+		if nboot > maskid.sum() and len(boot_stack):
+			nboot = maskid.sum()
+
+
+	etboot = []
+	exboot = []
+
+
+	SHEAR=np.zeros(nbin,float)
+	CERO=np.zeros(nbin,float)
+	R=np.zeros(nbin,float)
+	err=np.zeros(nbin,float)
+	error_et=np.zeros(nbin,float)
+	error_ex=np.zeros(nbin,float)
+	Mcorr=np.zeros(nbin,float)
+	N=np.zeros(nbin,float)
+		
 	
+	for BIN in np.arange(nbin):
+		# print 'BIN',BIN
+		rin  = bines[BIN]
+		rout = bines[BIN+1]
+		maskr=(r>=rin)*(r<rout)	
+		w2=peso[maskr]
+		pes2=w2.sum()			
+		shear=et[maskr]
+		cero=ex[maskr]
+		ERR=((sigma_c[maskr]*w2)**2)
+		mcorr=m[maskr]
+		n=len(shear)
+		R[BIN]=rin+(rout-rin)/2.0	
+		#~print n
+		N[BIN] = n
+		if n == 0:
+			SHEAR[BIN]=0.0
+			CERO[BIN]=0.0
+			err[BIN]=0.
+			error_et[BIN],error_ex[BIN]=0.,0.
+			Mcorr[BIN]=1.
+		else:	
+			SHEAR[BIN]=np.sum(shear*np.cos(angle[maskr])*w2)/np.sum((np.cos(angle[maskr])**2)*w2)
+			CERO[BIN]=np.sum(cero*np.sin(angle[maskr])*w2)/np.sum((np.sin(angle[maskr])**2)*w2)
+			sigma_e=(0.28**2.)
+			ERR2=(ERR*sigma_e).sum()
+			err[BIN]=((ERR2)/((pes2.sum())**2))**0.5			
+			Mcorr[BIN]=1+np.average(mcorr,weights=w2)
+			if booterror_flag:
+				if len(boot_stack):
+					error_et[BIN],error_ex[BIN],etboot0,exboot0 = bootstrap_errors_stack(shear,cero,w2,nboot,boot_stack[maskr])
+				else:
+					error_et[BIN],error_ex[BIN],etboot0,exboot0 = bootstrap_errors(shear,cero,w2,nboot)
+				etboot += [etboot0]
+				exboot += [exboot0]
+				#SHEAR[BIN]=np.average(etboot0)
+				#SHEAR[BIN]=np.average(exboot0)
+			elif len(boot_stack):
+				error_et[BIN],error_ex[BIN],etboot0,exboot0 = errors_disp_halos(shear,cero,w2,boot_stack[maskr])
+				etboot += [etboot0]
+				exboot += [exboot0]
+			else:
+				error_et[BIN],error_ex[BIN] = err[BIN],err[BIN]
+		
+	if cov_matrix:
+		CVet = covariance_matrix(etboot)
+		CVex = covariance_matrix(exboot)
+	else:
+		CVet = None
+		CVex = None
+		
+	return [R,SHEAR/Mcorr,CERO/Mcorr,err/Mcorr,nbin,error_et/Mcorr,error_ex/Mcorr,N,CVet,CVex]	
 
 def sigma_C(redshifts):
 
