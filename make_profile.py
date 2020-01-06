@@ -85,8 +85,8 @@ def qbootstrap_errors(et,ex,peso,angle,nboot):
 	W=peso[INDEX]	
 	A = angle[INDEX]
 	
-	et_means = np.sum(ET*np.cos(A)*W)/np.sum((np.cos(A)**2)*W)
-	ex_means = np.sum(EX*np.sin(A)*W)/np.sum((np.sin(A)**2)*W)
+	et_means = np.sum((ET*np.cos(A)*W),axis=1)/np.sum(((np.cos(A)**2)*W),axis=1)
+	ex_means = np.sum((EX*np.sin(A)*W),axis=1)/np.sum(((np.sin(A)**2)*W),axis=1)
 	
 	return np.std(et_means),np.std(ex_means),et_means,ex_means
 
