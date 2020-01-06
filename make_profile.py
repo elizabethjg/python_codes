@@ -75,11 +75,69 @@ def bootstrap_errors(et,ex,peso,nboot):
 	
 	return np.std(et_means),np.std(ex_means),et_means,ex_means
 
+def qbootstrap_errors(et,ex,peso,angle,nboot):
+	index=np.arange(len(et))
+	with NumpyRNGContext(1):
+		bootresult = bootstrap(index, nboot)
+	INDEX=bootresult.astype(int)
+	ET=et[INDEX]	
+	EX=ex[INDEX]	
+	W=peso[INDEX]	
+	A = angle[INDEX]
+	
+	et_means = np.sum(ET*np.cos(A)*W)/np.sum((np.cos(A)**2)*W)
+	ex_means = np.sum(EX*np.sin(A)*W)/np.sum((np.sin(A)**2)*W)
+	
+	return np.std(et_means),np.std(ex_means),et_means,ex_means
+
+
 def shear_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,
                       ndots=15,stepbin=False,booterror_flag=False,
                       lin=False,boot_stack=[],nboot = 100,cov_matrix = False):
 	
-	# t1 = time.time()
+	'''
+	COMPUTE DENSITY PROFILE
+	
+	------------------------------------------------------
+	INPUT
+	------------------------------------------------------
+	RIN               (float) Radius in kpc from which it is going 
+	                  to start binning
+	ROUT              (float) Radius in kpc from which it is going 
+	                  to finish binning
+	r                 (float array) distance from the centre in kpc
+	et                (float array) tangential ellipticity component
+	                  scaled by the critical density (M_sun/pc^2)
+	ex                (float array) cross ellipticity component
+	                  scaled by the critical density (M_sun/pc^2)
+	peso              (float array) weight for each shear component
+	                  scaled according to sigma_c^-2
+	m                 (float array) correction factor
+	sigma_c           (float array) critical density (M_sun/pc^2)
+	                  used only to compute the error in each bin
+	                  considering shape noise only
+	ndots             (int) number of bins in the profile
+	stepbin           (float) length of the bin instead of ndots
+	                  if False, it is going to use ndots
+	booterror_flag    (bool) if True it is going to use bootstraping
+	                  to compute the error in each bin
+	lin               (bool) if True it is going to use linalg spacing
+	                  between the bins
+	boot_stack        (array) used to do the bootstraping, if it is empty
+	                  the bootstrap is going to be executed over the whole
+	                  sample
+	nboot             (int) number of bootstrap repetitions
+	cov_matrix        (bool) if true it is going to compute the covariance matrix
+	                  - this is still in testing process
+
+	------------------------------------------------------
+	OUTPUT
+	------------------------------------------------------
+
+
+	'''
+
+
 	
 		
 	if lin:
@@ -183,7 +241,7 @@ def shear_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,
 
 def quadrupole_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,angle,
                       ndots=15,stepbin=False,booterror_flag=False,
-                      lin=False,boot_stack=[],nboot = 100,cov_matrix = False):
+                      lin=False,nboot = 100):
 		
 	if lin:
 		if stepbin:
@@ -198,22 +256,6 @@ def quadrupole_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,angle,
 			nbin = int(ndots)
 		bines = np.logspace(np.log10(RIN),np.log10(ROUT),num=nbin+1)
 		
-	if cov_matrix and len(boot_stack):
-		ides       = np.unique(boot_stack)
-		digit      = np.digitize(r,bines)
-		totbines   = np.arange(1,nbin+1)
-		maskid     = np.array([all(np.in1d(totbines,digit[boot_stack==x])==True) for x in ides])
-		maskides   = np.in1d(boot_stack,ides[maskid])
-		boot_stack = boot_stack[maskides]
-		r          = r[maskides]
-		et         = et[maskides]
-		ex         = ex[maskides]
-		peso       = peso[maskides]
-		m          = m[maskides]
-		sigma_c    = sigma_c[maskides]
-		if nboot > maskid.sum() and len(boot_stack):
-			nboot = maskid.sum()
-
 
 	etboot = []
 	exboot = []
@@ -231,17 +273,17 @@ def quadrupole_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,angle,
 	
 	for BIN in np.arange(nbin):
 		# print 'BIN',BIN
-		rin  = bines[BIN]
-		rout = bines[BIN+1]
-		maskr=(r>=rin)*(r<rout)	
-		w2=peso[maskr]
-		pes2=w2.sum()			
-		shear=et[maskr]
-		cero=ex[maskr]
-		ERR=((sigma_c[maskr]*w2)**2)
-		mcorr=m[maskr]
-		n=len(shear)
-		R[BIN]=rin+(rout-rin)/2.0	
+		rin    = bines[BIN]
+		rout   = bines[BIN+1]
+		maskr  = (r>=rin)*(r<rout)	
+		w2     = peso[maskr]
+		pes2   = w2.sum()			
+		shear  = et[maskr]
+		cero   = ex[maskr]
+		ERR    = ((sigma_c[maskr]*w2)**2)
+		mcorr  = m[maskr]
+		n      = len(shear)
+		R[BIN] = rin+(rout-rin)/2.0	
 		#~print n
 		N[BIN] = n
 		if n == 0:
@@ -258,29 +300,14 @@ def quadrupole_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,angle,
 			err[BIN]=((ERR2)/((pes2.sum())**2))**0.5			
 			Mcorr[BIN]=1+np.average(mcorr,weights=w2)
 			if booterror_flag:
-				if len(boot_stack):
-					error_et[BIN],error_ex[BIN],etboot0,exboot0 = bootstrap_errors_stack(shear,cero,w2,nboot,boot_stack[maskr])
-				else:
-					error_et[BIN],error_ex[BIN],etboot0,exboot0 = bootstrap_errors(shear,cero,w2,nboot)
-				etboot += [etboot0]
-				exboot += [exboot0]
-				#SHEAR[BIN]=np.average(etboot0)
-				#SHEAR[BIN]=np.average(exboot0)
-			elif len(boot_stack):
-				error_et[BIN],error_ex[BIN],etboot0,exboot0 = errors_disp_halos(shear,cero,w2,boot_stack[maskr])
+				error_et[BIN],error_ex[BIN],etboot0,exboot0 = qbootstrap_errors(shear,cero,w2,angle[maskr],nboot)
 				etboot += [etboot0]
 				exboot += [exboot0]
 			else:
 				error_et[BIN],error_ex[BIN] = err[BIN],err[BIN]
 		
-	if cov_matrix:
-		CVet = covariance_matrix(etboot)
-		CVex = covariance_matrix(exboot)
-	else:
-		CVet = None
-		CVex = None
 		
-	return [R,SHEAR/Mcorr,CERO/Mcorr,err/Mcorr,nbin,error_et/Mcorr,error_ex/Mcorr,N,CVet,CVex]	
+	return [R,SHEAR/Mcorr,CERO/Mcorr,err/Mcorr,nbin,error_et/Mcorr,error_ex/Mcorr,N]	
 
 def sigma_C(redshifts):
 
