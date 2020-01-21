@@ -85,8 +85,8 @@ def qbootstrap_errors(et,ex,peso,angle,nboot):
 	W=peso[INDEX]	
 	A = angle[INDEX]
 	
-	et_means = np.sum((ET*np.cos(A)*W),axis=1)/np.sum(((np.cos(A)**2)*W),axis=1)
-	ex_means = np.sum((EX*np.sin(A)*W),axis=1)/np.sum(((np.sin(A)**2)*W),axis=1)
+	et_means = np.sum((ET*np.cos(2.*A)*W),axis=1)/np.sum(((np.cos(2.*A)**2)*W),axis=1)
+	ex_means = np.sum((EX*np.sin(2.*A)*W),axis=1)/np.sum(((np.sin(2.*A)**2)*W),axis=1)
 	
 	return np.std(et_means),np.std(ex_means),et_means,ex_means
 
@@ -293,8 +293,8 @@ def quadrupole_profile_log(RIN,ROUT,r,et,ex,peso,m,sigma_c,angle,
 			error_et[BIN],error_ex[BIN]=0.,0.
 			Mcorr[BIN]=1.
 		else:	
-			SHEAR[BIN]=np.sum(shear*np.cos(angle[maskr])*w2)/np.sum((np.cos(angle[maskr])**2)*w2)
-			CERO[BIN]=np.sum(cero*np.sin(angle[maskr])*w2)/np.sum((np.sin(angle[maskr])**2)*w2)
+			SHEAR[BIN]= np.sum(shear*np.cos(2.*angle[maskr])*w2)/np.sum((np.cos(2.*angle[maskr])**2)*w2)
+			CERO[BIN] = np.sum(cero*np.sin(2.*angle[maskr])*w2)/np.sum((np.sin(2.*angle[maskr])**2)*w2)
 			sigma_e=(0.28**2.)
 			ERR2=(ERR*sigma_e).sum()
 			err[BIN]=((ERR2)/((pes2.sum())**2))**0.5			
